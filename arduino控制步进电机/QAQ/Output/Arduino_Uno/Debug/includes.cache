@@ -1,0 +1,17 @@
+[
+  {
+    "Sourcefile": null,
+    "Include": "",
+    "Includepath": "C:\\Users\\llh13\\Documents\\ArduinoData\\packages\\arduino\\hardware\\avr\\1.8.6\\cores\\arduino"
+  },
+  {
+    "Sourcefile": null,
+    "Include": "",
+    "Includepath": "C:\\Users\\llh13\\Documents\\ArduinoData\\packages\\arduino\\hardware\\avr\\1.8.6\\variants\\standard"
+  },
+  {
+    "Sourcefile": "D:\\code\\c语言自学\\QAQ\\QAQ\\Output\\Arduino_Uno\\Debug\\sketch\\QAQ.ino.cpp",
+    "Include": "",
+    "Includepath": null
+  }
+]
