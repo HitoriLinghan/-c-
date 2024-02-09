@@ -61,18 +61,22 @@ private:
 
 byte readMPU6050(byte reg);
 void writeMPU6050(byte reg, byte data);
-void MPU6050_update_GetData();  //得到角速度xyz
+void MPU6050_update_GetAngle();  //得到角速度xyz
+void MPU6050_update_GetAcc();
 void shanwai_oscilloscope_send(uint8_t *data, uint8_t len);
 
 OneDimensionalKalmanFilter kfx_angel(0, 100, 0.1, 1);
 OneDimensionalKalmanFilter kfy_angel(0, 100, 0.1, 1);
 OneDimensionalKalmanFilter kfz_angel(0, 100, 0.1, 1);
+OneDimensionalKalmanFilter kfx_acc(0, 1, 0.1, 1);
+OneDimensionalKalmanFilter kfy_acc(0, 1, 0.1, 1);
+OneDimensionalKalmanFilter kfz_acc(0, 1, 0.1, 1);
 
 int16_t rx, ry, rz, ax, ay, az;
 float x, y, z, xa, ya, za;
 float angleX, angleY, angleZ, accX, accY, accZ;  //最终输出值
 float LSB_angle = 65.5;                          //500dps
-float LSB_acc = NULL;
+long LSB_acc = 16384;
 float angle_offsetX = 0, angle_offsetY = 0, angle_offsetZ = 0,
       acc_offsetX = 0, acc_offsetY = 0, acc_offsetZ = 0;
 long past = 0;
@@ -87,11 +91,24 @@ void setup() {
 
 void loop() {
 
-  MPU6050_update_GetData();
+  // MPU6050_update_GetAcc();
+  // //输出加速度
+  // kfx_acc.predict();
+  // kfx_acc.update(xa);
 
+  // Serial.print(kfx_acc.getStateEstimate());
+  // Serial.print(",");
+  // kfy_acc.predict();
+  // kfy_acc.update(ya);
+  // Serial.print(kfy_acc.getStateEstimate());
+  // Serial.print(",");
+  // kfz_acc.predict();
+  // kfz_acc.update(za);
+  // Serial.println(kfz_acc.getStateEstimate());
+  //输出角度
+  MPU6050_update_GetAngle();
   kfx_angel.predict();
   kfx_angel.update(angleX);
-
   Serial.print(kfx_angel.getStateEstimate());
   Serial.print(",");
   kfy_angel.predict();
@@ -102,7 +119,6 @@ void loop() {
   kfz_angel.update(angleZ);
   Serial.println(kfz_angel.getStateEstimate());
 
-  // Serial.println((millis() - past));
 }
 
 void writeMPU6050(byte reg, byte data) {
@@ -124,7 +140,7 @@ byte readMPU6050(byte reg) {
 void MPU6050_init() {
 
   writeMPU6050(MPU6050_SMPLRT_DIV, 0x00);
-  writeMPU6050(MPU6050_CONFIG, 0x36);       //低通滤波拉满了
+  writeMPU6050(MPU6050_CONFIG, 0x00);       //低通滤波拉满了
   writeMPU6050(MPU6050_GYRO_CONFIG, 0x08);  //500 dps
   writeMPU6050(MPU6050_ACCEL_CONFIG, 0x00);
   writeMPU6050(MPU6050_PWR_MGMT_1, 0x01);
@@ -133,7 +149,7 @@ void MPU6050_init() {
   float sumX_angle = 0, sumY_angle = 0, sumZ_angle = 0;
   float sumX_acc = 0, sumY_acc = 0, sumZ_acc = 0;
   for (int i = 0; i < numReadings; i++) {
-    MPU6050_update_GetData();
+    MPU6050_update_GetAngle();
     sumX_angle += x;
     sumY_angle += y;
     sumZ_angle += z;
@@ -150,8 +166,9 @@ void MPU6050_init() {
   acc_offsetZ = sumZ_acc / numReadings;
 }
 
-void MPU6050_update_GetData() {
+void MPU6050_update_GetAngle() {
   long currentTime = millis();  // 先记录当前时间
+
   Wire.beginTransmission(MPU6050_ADDR);
   Wire.write(0x43);
   Wire.endTransmission();
@@ -170,9 +187,27 @@ void MPU6050_update_GetData() {
   angleY += y * ((currentTime - past) / 1000.0);
   angleZ += z * ((currentTime - past) / 1000.0);
 
+
+
+
   past = currentTime;  // 更新'past'到当前时间以供下次计算
 }
 
+void MPU6050_update_GetAcc() {
+  //得到加速度
+  Wire.beginTransmission(MPU6050_ADDR);
+  Wire.write(0x3b);
+  Wire.endTransmission();
+  Wire.requestFrom((int)MPU6050_ADDR, 6);
+
+  ax = Wire.read() << 8 | Wire.read();
+  ay = Wire.read() << 8 | Wire.read();
+  az = Wire.read() << 8 | Wire.read();
+
+  xa = (ax / LSB_acc) - acc_offsetX;
+  ya = (ay / LSB_acc) - acc_offsetY;
+  za = (az / LSB_acc) - acc_offsetZ;
+}
 //接入山外调试助手(目前没有实装)
 void shanwai_oscilloscope_send(uint8_t *data, uint8_t len) {
   const uint8_t cmdhead[2] = { 0x03, 0xfc };
