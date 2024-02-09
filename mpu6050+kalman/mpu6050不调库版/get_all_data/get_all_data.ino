@@ -1,9 +1,9 @@
 /***************************************************************
- * @file       程序文件的名称
- * @brief      程序文件的功能
- * @author     作者
- * @version    版本号
- * @date       日期
+ * @file       程序文件的名称:get_all_data
+ * @brief      程序文件的功能:读取mpu6050的各种数据，进行kalman滤波
+ * @author     作者:HitoriLingHan
+ * @version    版本号:1.1
+ * @date       日期:2024年2月9日
  **************************************************************/
 
 #include <Wire.h>
@@ -63,19 +63,22 @@ byte readMPU6050(byte reg);
 void writeMPU6050(byte reg, byte data);
 void MPU6050_update_GetAngle();  //得到角速度xyz
 void MPU6050_update_GetAcc();
+void MPU6050_update_Temperature();
 void shanwai_oscilloscope_send(uint8_t *data, uint8_t len);
 
-OneDimensionalKalmanFilter kfx_angel(0, 100, 0.1, 1);
+OneDimensionalKalmanFilter kfx_angel(0, 100, 0.1, 0.1);
 OneDimensionalKalmanFilter kfy_angel(0, 100, 0.1, 1);
 OneDimensionalKalmanFilter kfz_angel(0, 100, 0.1, 1);
 OneDimensionalKalmanFilter kfx_acc(0, 1, 0.1, 1);
 OneDimensionalKalmanFilter kfy_acc(0, 1, 0.1, 1);
 OneDimensionalKalmanFilter kfz_acc(0, 1, 0.1, 1);
+OneDimensionalKalmanFilter kf_temperature(0, 1, 0.1, 1);
 
 int16_t rx, ry, rz, ax, ay, az;
-float x, y, z, xa, ya, za;
-float angleX, angleY, angleZ, accX, accY, accZ;  //最终输出值
-float LSB_angle = 65.5;                          //500dps
+float x, y, z, t;
+float angleX, angleY, angleZ, xa, ya, za, temeprature;  //最终输出值
+float temeprature_std, temp_offset = 0;                 //温度基准
+float LSB_angle = 65.5;                                 //500dps
 long LSB_acc = 16384;
 float angle_offsetX = 0, angle_offsetY = 0, angle_offsetZ = 0,
       acc_offsetX = 0, acc_offsetY = 0, acc_offsetZ = 0;
@@ -90,12 +93,10 @@ void setup() {
 }
 
 void loop() {
-
-  // MPU6050_update_GetAcc();
   // //输出加速度
+  // MPU6050_update_GetAcc();
   // kfx_acc.predict();
   // kfx_acc.update(xa);
-
   // Serial.print(kfx_acc.getStateEstimate());
   // Serial.print(",");
   // kfy_acc.predict();
@@ -105,6 +106,7 @@ void loop() {
   // kfz_acc.predict();
   // kfz_acc.update(za);
   // Serial.println(kfz_acc.getStateEstimate());
+
   //输出角度
   MPU6050_update_GetAngle();
   kfx_angel.predict();
@@ -118,7 +120,11 @@ void loop() {
   kfz_angel.predict();
   kfz_angel.update(angleZ);
   Serial.println(kfz_angel.getStateEstimate());
-
+  // //输出温度
+  // MPU6050_update_Temperature();
+  // kf_temperature.predict();
+  // kf_temperature.update(temeprature);
+  // Serial.println(kf_temperature.getStateEstimate());
 }
 
 void writeMPU6050(byte reg, byte data) {
@@ -147,7 +153,7 @@ void MPU6050_init() {
   delay(100);
   int numReadings = 1000;
   float sumX_angle = 0, sumY_angle = 0, sumZ_angle = 0;
-  float sumX_acc = 0, sumY_acc = 0, sumZ_acc = 0;
+  float sumX_acc = 0, sumY_acc = 0, sumZ_acc = 0, sum_temp = 0;
   for (int i = 0; i < numReadings; i++) {
     MPU6050_update_GetAngle();
     sumX_angle += x;
@@ -156,6 +162,7 @@ void MPU6050_init() {
     sumX_angle += ax;
     sumY_angle += ay;
     sumZ_angle += az;
+    sum_temp += temeprature;
     delay(1);  // 稍微延迟以获取新的读数
   }
   angle_offsetX = sumX_angle / numReadings;
@@ -164,6 +171,11 @@ void MPU6050_init() {
   acc_offsetX = sumX_acc / numReadings;
   acc_offsetY = sumY_acc / numReadings;
   acc_offsetZ = sumZ_acc / numReadings;
+  temeprature_std = sum_temp / numReadings;
+  temeprature = temeprature_std;
+
+  MPU6050_update_GetAngle();
+  temp_offset = (angleX - angle_offsetX);
 }
 
 void MPU6050_update_GetAngle() {
@@ -178,17 +190,14 @@ void MPU6050_update_GetAngle() {
   ry = Wire.read() << 8 | Wire.read();
   rz = Wire.read() << 8 | Wire.read();
 
-  x = (rx / LSB_angle) - angle_offsetX;
-  y = (ry / LSB_angle) - angle_offsetY;
-  z = (rz / LSB_angle) - angle_offsetZ;
+  x = ((rx / LSB_angle) - angle_offsetX);
+  y = ((ry / LSB_angle) - angle_offsetY);
+  z = ((rz / LSB_angle) - angle_offsetZ);
 
   // 使用旧的past值和新的currentTime进行积分计算
   angleX += x * ((currentTime - past) / 1000.0);
   angleY += y * ((currentTime - past) / 1000.0);
   angleZ += z * ((currentTime - past) / 1000.0);
-
-
-
 
   past = currentTime;  // 更新'past'到当前时间以供下次计算
 }
@@ -204,10 +213,20 @@ void MPU6050_update_GetAcc() {
   ay = Wire.read() << 8 | Wire.read();
   az = Wire.read() << 8 | Wire.read();
 
-  xa = (ax / LSB_acc) - acc_offsetX;
+  xa = (ax / LSB_acc) - acc_offsetX - temp_offset;
   ya = (ay / LSB_acc) - acc_offsetY;
   za = (az / LSB_acc) - acc_offsetZ;
 }
+void MPU6050_update_Temperature() {
+  //得到温度，对angleX进行消除零飘
+  Wire.beginTransmission(MPU6050_ADDR);
+  Wire.write(0x41);
+  Wire.endTransmission();
+  Wire.requestFrom((int)MPU6050_ADDR, 2);
+  t = Wire.read() << 8 | Wire.read();
+  temeprature = (t / 340.0) + 36.53;
+}
+
 //接入山外调试助手(目前没有实装)
 void shanwai_oscilloscope_send(uint8_t *data, uint8_t len) {
   const uint8_t cmdhead[2] = { 0x03, 0xfc };
