@@ -1,0 +1,7 @@
+{
+    "port": "COM22",
+    "configuration": "cpu=atmega328old",
+    "board": "arduino:avr:nano",
+    "programmer": "arduinoisp",
+    "sketch": "mpu6050+kalman\\GetAngle.ino"
+}

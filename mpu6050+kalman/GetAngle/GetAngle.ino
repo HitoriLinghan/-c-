@@ -61,7 +61,7 @@ private:
 
 byte readMPU6050(byte reg);
 void writeMPU6050(byte reg, byte data);
-void MPU6050_update_rotation();  //得到角速度xyz
+void MPU6050_update_GetData();  //得到角速度xyz
 void shanwai_oscilloscope_send(uint8_t *data, uint8_t len);
 
 OneDimensionalKalmanFilter kfx_angel(0, 100, 0.1, 1);
@@ -87,7 +87,7 @@ void setup() {
 
 void loop() {
 
-  MPU6050_update_rotation();
+  MPU6050_update_GetData();
 
   kfx_angel.predict();
   kfx_angel.update(angleX);
@@ -133,7 +133,7 @@ void MPU6050_init() {
   float sumX_angle = 0, sumY_angle = 0, sumZ_angle = 0;
   float sumX_acc = 0, sumY_acc = 0, sumZ_acc = 0;
   for (int i = 0; i < numReadings; i++) {
-    MPU6050_update_rotation();
+    MPU6050_update_GetData();
     sumX_angle += x;
     sumY_angle += y;
     sumZ_angle += z;
@@ -150,7 +150,7 @@ void MPU6050_init() {
   acc_offsetZ = sumZ_acc / numReadings;
 }
 
-void MPU6050_update_rotation() {
+void MPU6050_update_GetData() {
   long currentTime = millis();  // 先记录当前时间
   Wire.beginTransmission(MPU6050_ADDR);
   Wire.write(0x43);
@@ -173,7 +173,7 @@ void MPU6050_update_rotation() {
   past = currentTime;  // 更新'past'到当前时间以供下次计算
 }
 
-//接入山外调试助手
+//接入山外调试助手(目前没有实装)
 void shanwai_oscilloscope_send(uint8_t *data, uint8_t len) {
   const uint8_t cmdhead[2] = { 0x03, 0xfc };
   const uint8_t cmdtail[2] = { 0xfc, 0x03 };
