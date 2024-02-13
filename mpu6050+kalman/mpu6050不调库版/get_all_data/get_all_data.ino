@@ -66,10 +66,10 @@ void MPU6050_update_GetAcc();
 void MPU6050_update_Temperature();
 void shanwai_oscilloscope_send(uint8_t *data, uint8_t len);
 
-OneDimensionalKalmanFilter kfx_angel(0, 100, 0.1, 0.1);
+OneDimensionalKalmanFilter kfx_angel(0, 1000, 1, 1);
 OneDimensionalKalmanFilter kfy_angel(0, 100, 0.1, 1);
 OneDimensionalKalmanFilter kfz_angel(0, 100, 0.1, 1);
-OneDimensionalKalmanFilter kfx_acc(0, 1, 0.1, 1);
+OneDimensionalKalmanFilter kfx_acc(0, 100, 0.1, 1);
 OneDimensionalKalmanFilter kfy_acc(0, 1, 0.1, 1);
 OneDimensionalKalmanFilter kfz_acc(0, 1, 0.1, 1);
 OneDimensionalKalmanFilter kf_temperature(0, 1, 0.1, 1);
@@ -90,36 +90,37 @@ void setup() {
   Serial.begin(9600);
   MPU6050_init();
   delay(100);
+  xa=ya=za=0;
 }
 
 void loop() {
   // //输出加速度
-  // MPU6050_update_GetAcc();
-  // kfx_acc.predict();
-  // kfx_acc.update(xa);
-  // Serial.print(kfx_acc.getStateEstimate());
-  // Serial.print(",");
-  // kfy_acc.predict();
-  // kfy_acc.update(ya);
-  // Serial.print(kfy_acc.getStateEstimate());
-  // Serial.print(",");
-  // kfz_acc.predict();
-  // kfz_acc.update(za);
-  // Serial.println(kfz_acc.getStateEstimate());
+  MPU6050_update_GetAcc();
+  kfx_acc.predict();
+  kfx_acc.update(xa);
+  Serial.print(kfx_acc.getStateEstimate());
+  Serial.print(",");
+  kfy_acc.predict();
+  kfy_acc.update(ya);
+  Serial.print(kfy_acc.getStateEstimate());
+  Serial.print(",");
+  kfz_acc.predict();
+  kfz_acc.update(za);
+  Serial.println(kfz_acc.getStateEstimate());
 
   //输出角度
-  MPU6050_update_GetAngle();
-  kfx_angel.predict();
-  kfx_angel.update(angleX);
-  Serial.print(kfx_angel.getStateEstimate());
-  Serial.print(",");
-  kfy_angel.predict();
-  kfy_angel.update(angleY);
-  Serial.print(kfy_angel.getStateEstimate());
-  Serial.print(",");
-  kfz_angel.predict();
-  kfz_angel.update(angleZ);
-  Serial.println(kfz_angel.getStateEstimate());
+  // MPU6050_update_GetAngle();
+  // kfx_angel.predict();
+  // kfx_angel.update(angleX);
+  // Serial.print(kfx_angel.getStateEstimate());
+  // Serial.print(",");
+  // kfy_angel.predict();
+  // kfy_angel.update(angleY);
+  // Serial.print(kfy_angel.getStateEstimate());
+  // Serial.print(",");
+  // kfz_angel.predict();
+  // kfz_angel.update(angleZ);
+  // Serial.println(kfz_angel.getStateEstimate());
   // //输出温度
   // MPU6050_update_Temperature();
   // kf_temperature.predict();
@@ -195,7 +196,7 @@ void MPU6050_update_GetAngle() {
   z = ((rz / LSB_angle) - angle_offsetZ);
 
   // 使用旧的past值和新的currentTime进行积分计算
-  angleX += x * ((currentTime - past) / 1000.0);
+  angleX += x * ((currentTime - past) / 1000.0)- temp_offset;
   angleY += y * ((currentTime - past) / 1000.0);
   angleZ += z * ((currentTime - past) / 1000.0);
 
@@ -213,7 +214,7 @@ void MPU6050_update_GetAcc() {
   ay = Wire.read() << 8 | Wire.read();
   az = Wire.read() << 8 | Wire.read();
 
-  xa = (ax / LSB_acc) - acc_offsetX - temp_offset;
+  xa = (ax / LSB_acc) - acc_offsetX ;
   ya = (ay / LSB_acc) - acc_offsetY;
   za = (az / LSB_acc) - acc_offsetZ;
 }
